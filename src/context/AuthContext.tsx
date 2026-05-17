@@ -5,6 +5,7 @@ interface User {
   email: string;
   full_name: string | null;
   role: string;
+  picture?: string | null;
 }
 
 interface AuthContextType {
@@ -12,6 +13,7 @@ interface AuthContextType {
   token: string | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<{ error: string | null }>;
+  loginWithGoogle: (idToken: string) => Promise<{ error: string | null }>;
   register: (email: string, password: string, fullName: string) => Promise<{ error: string | null }>;
   logout: () => void;
   isAdmin: boolean;
@@ -64,6 +66,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  const loginWithGoogle = useCallback(async (idToken: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/google`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id_token: idToken }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        return { error: data.error || "Login Google gagal" };
+      }
+
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
+
+      setToken(data.token);
+      setUser(data.user);
+
+      return { error: null };
+    } catch {
+      return { error: "Terjadi kesalahan koneksi" };
+    }
+  }, []);
+
   const login = useCallback(async (email: string, password: string) => {
     try {
       const res = await fetch(`${API_BASE}/auth/login`, {
@@ -101,7 +129,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isAdmin = user?.role === "admin";
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, isAdmin }}>
+    <AuthContext.Provider value={{ user, token, loading, login, loginWithGoogle, register, logout, isAdmin }}>
       {children}
     </AuthContext.Provider>
   );

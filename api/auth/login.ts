@@ -26,6 +26,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(401).json({ error: "Email atau password salah" });
     }
 
+    // User registered via Google (no password)
+    if (!user.password) {
+      return res.status(401).json({ error: "Akun ini terdaftar dengan Google. Silakan login menggunakan Google." });
+    }
+
     const isValid = await bcrypt.compare(password, user.password);
 
     if (!isValid) {

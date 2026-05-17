@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -11,10 +11,12 @@ import { useToast } from "@/hooks/use-toast";
 
 const Auth = () => {
   const navigate = useNavigate();
-  const { user, loading, login, register } = useAuth();
+  const { user, loading, login, loginWithGoogle, register } = useAuth();
   const { toast } = useToast();
+  const googleButtonRef = useRef<HTMLDivElement>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [signUpEmail, setSignUpEmail] = useState("");
@@ -26,6 +28,61 @@ const Auth = () => {
       navigate(user.role === "admin" ? "/admin" : "/dashboard");
     }
   }, [user, loading, navigate]);
+
+  // Fetch Google Client ID from backend, then load Google Sign-In
+  const [googleClientId, setGoogleClientId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/config")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.googleClientId) {
+          setGoogleClientId(data.googleClientId);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!googleClientId) return;
+
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      if (window.google && googleButtonRef.current) {
+        window.google.accounts.id.initialize({
+          client_id: googleClientId,
+          callback: handleGoogleResponse,
+          cancel_on_tap_outside: false,
+        });
+        window.google.accounts.id.renderButton(
+          googleButtonRef.current,
+          { theme: "outline", size: "large", width: "100%", text: "signin_with", shape: "rectangular" }
+        );
+      }
+    };
+    document.body.appendChild(script);
+
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, [googleClientId]);
+
+  const handleGoogleResponse = async (response: any) => {
+    setIsGoogleLoading(true);
+    const { error } = await loginWithGoogle(response.credential);
+    setIsGoogleLoading(false);
+
+    if (error) {
+      toast({
+        title: "Login Google Gagal",
+        description: error,
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,7 +130,6 @@ const Auth = () => {
         title: "Pendaftaran Berhasil",
         description: "Akun Anda berhasil dibuat! Silakan login.",
       });
-      // Switch to login tab after successful registration
       setLoginEmail(signUpEmail);
       setLoginPassword(signUpPassword);
     }
@@ -103,6 +159,26 @@ const Auth = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Google Sign-In Button */}
+          {googleClientId && (
+            <div className="mb-6">
+              <div ref={googleButtonRef} className="flex justify-center"></div>
+              {isGoogleLoading && (
+                <div className="flex justify-center mt-2">
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                </div>
+              )}
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">Atau</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           <Tabs defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Masuk</TabsTrigger>
@@ -201,3 +277,17 @@ const Auth = () => {
 };
 
 export default Auth;
+
+// Type declaration for Google's API
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (config: any) => void;
+          renderButton: (element: HTMLElement, options: any) => void;
+        };
+      };
+    };
+  }
+}
