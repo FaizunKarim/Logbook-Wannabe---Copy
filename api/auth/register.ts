@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { prisma } from "../_lib/prisma";
+import { getPrismaClient } from "../_lib/prisma";
 import bcrypt from "bcryptjs";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -18,6 +18,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: "Password minimal 6 karakter" });
     }
 
+    const prisma = getPrismaClient();
     const existingUser = await prisma.user.findUnique({
       where: { email },
     });

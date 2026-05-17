@@ -87,8 +87,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(data.user);
 
       return { error: null };
-    } catch {
-      return { error: "Terjadi kesalahan koneksi" };
+    } catch (err) {
+      return { error: "Terjadi kesalahan koneksi: " + (err instanceof Error ? err.message : String(err)) };
     }
   }, []);
 

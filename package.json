@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "api": "node server.js",
+    "dev:all": "node -e \"const{spawn}=require('child_process');spawn('node',['server.js'],{stdio:'inherit'});spawn('npx',['vite'],{stdio:'inherit',shell:true});\"",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",

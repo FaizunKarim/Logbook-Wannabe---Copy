@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { prisma } from "../_lib/prisma";
+import { getPrismaClient } from "../_lib/prisma";
 import { verifyToken, getTokenFromHeader } from "../_lib/jwt";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -21,6 +21,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: "Nama lengkap harus diisi" });
     }
 
+    const prisma = getPrismaClient();
     const profile = await prisma.profile.update({
       where: { userId: payload.id },
       data: { fullName: full_name.trim() },
