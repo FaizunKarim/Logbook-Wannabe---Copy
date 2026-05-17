@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -8,20 +8,25 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface Profile {
-  id: string;
-  user_id: string;
-  full_name: string | null;
-  email: string | null;
+  fullName: string | null;
+  nim: string | null;
 }
 
 interface Report {
   id: string;
   title: string;
   description: string;
-  file_url: string | null;
+  attachment: string | null;
   status: string;
-  created_at: string;
-  user_id: string;
+  createdAt: string;
+  userId: string;
+}
+
+interface UserData {
+  id: string;
+  email: string;
+  profile: Profile | null;
+  reports: Report[];
 }
 
 const statusColors: Record<string, string> = {
@@ -33,10 +38,10 @@ const statusColors: Record<string, string> = {
 const StudentDetail = () => {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
+  const { token } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [reports, setReports] = useState<Report[]>([]);
+  const [userData, setUserData] = useState<UserData | null>(null);
 
   const getInitials = (name: string | null) => {
     if (!name) return "?";
@@ -53,31 +58,19 @@ const StudentDetail = () => {
     });
   };
 
+  const headers = { Authorization: `Bearer ${token}` };
+
   const fetchStudentData = async () => {
-    if (!userId) return;
-    
+    if (!userId || !token) return;
+
     setLoading(true);
     try {
-      // Fetch user profile
-      const { data: profileData, error: profileError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("user_id", userId)
-        .single();
+      const res = await fetch(`/api/admin/users?userId=${userId}`, { headers });
+      const data = await res.json();
 
-      if (profileError) throw profileError;
-      setProfile(profileData);
+      if (!res.ok) throw new Error(data.error);
 
-      // Fetch user reports
-      const { data: reportsData, error: reportsError } = await supabase
-        .from("reports")
-        .select("*")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false });
-
-      if (reportsError) throw reportsError;
-      setReports(reportsData || []);
-
+      setUserData(data.user);
     } catch (error) {
       console.error("Error fetching student data:", error);
       toast({
@@ -92,13 +85,15 @@ const StudentDetail = () => {
 
   const handleApprove = async (reportId: string) => {
     try {
-      const { error } = await supabase
-        .from("reports")
-        .update({ status: "approved" })
-        .eq("id", reportId);
+      const res = await fetch(`/api/reports?id=${reportId}`, {
+        method: "PUT",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "approved" }),
+      });
 
-      if (error) throw error;
-      
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
       toast({
         title: "Berhasil",
         description: "Logbook telah disetujui",
@@ -116,13 +111,14 @@ const StudentDetail = () => {
 
   const handleReject = async (reportId: string) => {
     try {
-      const { error } = await supabase
-        .from("reports")
-        .delete()
-        .eq("id", reportId);
+      const res = await fetch(`/api/reports?id=${reportId}`, {
+        method: "DELETE",
+        headers,
+      });
 
-      if (error) throw error;
-      
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
       toast({
         title: "Berhasil",
         description: "Logbook telah ditolak dan dihapus",
@@ -140,7 +136,7 @@ const StudentDetail = () => {
 
   useEffect(() => {
     fetchStudentData();
-  }, [userId, toast]);
+  }, [userId, token]);
 
   if (loading) {
     return (
@@ -167,13 +163,13 @@ const StudentDetail = () => {
           <div className="flex items-center gap-4">
             <Avatar className="h-16 w-16">
               <AvatarFallback className="bg-primary text-primary-foreground text-xl">
-                {getInitials(profile?.full_name || null)}
+                {getInitials(userData?.profile?.fullName || null)}
               </AvatarFallback>
             </Avatar>
             <div>
-              <h2 className="text-xl font-bold">{profile?.full_name || "Mahasiswa"}</h2>
-              <p className="text-muted-foreground">{profile?.email || "-"}</p>
-              <p className="text-sm text-muted-foreground mt-1">Total Logbook: {reports.length} entri</p>
+              <h2 className="text-xl font-bold">{userData?.profile?.fullName || "Mahasiswa"}</h2>
+              <p className="text-muted-foreground">{userData?.email || "-"}</p>
+              <p className="text-sm text-muted-foreground mt-1">Total Logbook: {userData?.reports.length || 0} entri</p>
             </div>
           </div>
         </CardContent>
@@ -181,37 +177,37 @@ const StudentDetail = () => {
 
       <div className="space-y-4">
         <h3 className="text-lg font-semibold">Timeline Logbook</h3>
-        
-        {reports.length === 0 ? (
+
+        {!userData?.reports || userData.reports.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
               <p className="text-muted-foreground">Mahasiswa ini belum membuat logbook apapun</p>
             </CardContent>
           </Card>
         ) : (
-          reports.map((report) => (
+          userData.reports.map((report) => (
             <Card key={report.id} className="overflow-hidden">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 space-y-2">
                     <div className="flex items-center gap-3">
                       <h4 className="font-semibold">{report.title}</h4>
-                      <div className={`w-3 h-3 rounded-full ${statusColors[report.status]}`} />
+                      <div className={`w-3 h-3 rounded-full ${statusColors[report.status] || "bg-gray-400"}`} />
                     </div>
-                    <p className="text-xs text-muted-foreground">{formatDate(report.created_at)}</p>
+                    <p className="text-xs text-muted-foreground">{formatDate(report.createdAt)}</p>
                     <p className="text-sm text-muted-foreground">{report.description}</p>
                   </div>
                   <div className="flex gap-2">
-                    <Button 
-                      size="sm" 
+                    <Button
+                      size="sm"
                       className="bg-green-600 hover:bg-green-700"
                       onClick={() => handleApprove(report.id)}
                       disabled={report.status === 'approved'}
                     >
                       Acc
                     </Button>
-                    <Button 
-                      size="sm" 
+                    <Button
+                      size="sm"
                       variant="destructive"
                       onClick={() => handleReject(report.id)}
                     >

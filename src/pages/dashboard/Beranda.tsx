@@ -1,36 +1,27 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, MapPin, Image as ImageIcon, X, Send } from "lucide-react";
+import { Loader2, Plus, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
-interface Profile {
-  id: string;
-  user_id: string;
-  full_name: string | null;
-}
 
 interface Report {
   id: string;
   title: string;
   description: string;
-  log_date: string;
-  file_url: string | null;
+  logDate: string;
+  attachment: string | null;
   status: string;
-  created_at: string;
-  user_id: string;
-  profile?: Profile | null;
+  createdAt: string;
+  userId: string;
+  profile?: { fullName: string | null } | null;
 }
-
 
 const statusColors: Record<string, string> = {
   pending: "bg-yellow-500",
@@ -46,13 +37,12 @@ const statusLabels: Record<string, string> = {
   resolved: "Selesai",
 };
 
-
 const Beranda = () => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const { toast } = useToast();
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   // New report form
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newReport, setNewReport] = useState({
@@ -63,67 +53,39 @@ const Beranda = () => {
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+  };
+
   useEffect(() => {
-    fetchReports();
-
-    // Subscribe to realtime updates only for current user reports
-    const channel = supabase
-      .channel('reports-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'reports', filter: `user_id=eq.${user.id}` },
-        () => {
-          fetchReports();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
+    if (token) fetchReports();
+  }, [token]);
 
   const fetchReports = async () => {
-    if (!user) return;
-    
-    const { data: reportsData, error } = await supabase
-      .from("reports")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
+    if (!user || !token) return;
 
-    if (error) {
+    try {
+      const res = await fetch("/api/reports", { headers });
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error);
+
+      setReports(data.reports || []);
+    } catch (error) {
       console.error("Error fetching reports:", error);
       toast({
         title: "Error",
         description: "Gagal memuat laporan",
         variant: "destructive",
       });
+    } finally {
       setLoading(false);
-      return;
     }
-
-    // Fetch profiles for all users
-    const userIds = [...new Set(reportsData?.map(r => r.user_id) || [])];
-    const { data: profilesData } = await supabase
-      .from("profiles")
-      .select("*")
-      .in("user_id", userIds);
-
-    const profilesMap = new Map(profilesData?.map(p => [p.user_id, p]) || []);
-    
-    const reportsWithProfiles = reportsData?.map(report => ({
-      ...report,
-      profile: profilesMap.get(report.user_id) || null,
-    })) || [];
-
-    setReports(reportsWithProfiles);
-    setLoading(false);
   };
 
-
   const handleCreateReport = async () => {
-    if (!newReport.title || !newReport.description || !user) {
+    if (!newReport.title || !newReport.description || !user || !token) {
       toast({
         title: "Validasi Gagal",
         description: "Mohon lengkapi semua field yang diperlukan",
@@ -133,18 +95,22 @@ const Beranda = () => {
     }
 
     setSubmitting(true);
-    let fileUrl = null;
+    let attachmentUrl: string | null = null;
 
     // Upload attachment file if exists
     if (attachmentFile) {
-      const fileExt = attachmentFile.name.split('.').pop();
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-      
-      const { error: uploadError, data } = await supabase.storage
-        .from("report-images")
-        .upload(fileName, attachmentFile);
+      try {
+        const uploadRes = await fetch(`/api/upload?filename=${encodeURIComponent(attachmentFile.name)}`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: attachmentFile,
+        });
 
-      if (uploadError) {
+        const uploadData = await uploadRes.json();
+        if (!uploadRes.ok) throw new Error(uploadData.error);
+
+        attachmentUrl = uploadData.url;
+      } catch (error) {
         toast({
           title: "Error",
           description: "Gagal mengupload file",
@@ -153,43 +119,45 @@ const Beranda = () => {
         setSubmitting(false);
         return;
       }
-
-      const { data: urlData } = supabase.storage
-        .from("report-images")
-        .getPublicUrl(fileName);
-      
-      fileUrl = urlData.publicUrl;
     }
 
-    const { error } = await supabase.from("reports").insert({
-      user_id: user.id,
-      title: newReport.title,
-      description: newReport.description,
-      file_url: fileUrl,
-      log_date: newReport.log_date,
-    });
+    try {
+      const res = await fetch("/api/reports", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          title: newReport.title,
+          description: newReport.description,
+          log_date: newReport.log_date,
+          attachment: attachmentUrl,
+        }),
+      });
 
-    if (error) {
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error);
+
+      toast({
+        title: "Berhasil",
+        description: "Laporan berhasil dibuat",
+      });
+      setNewReport({
+        title: "",
+        description: "",
+        log_date: new Date().toISOString().split('T')[0],
+      });
+      setAttachmentFile(null);
+      setIsDialogOpen(false);
+      fetchReports();
+    } catch (error) {
       toast({
         title: "Error",
         description: "Gagal menambahkan Logbook",
         variant: "destructive",
       });
-    } else {
-      toast({
-        title: "Berhasil",
-        description: "Laporan berhasil dibuat",
-      });
-      setNewReport({ 
-        title: "", 
-        description: "", 
-        log_date: new Date().toISOString().split('T')[0]
-      });
-      setAttachmentFile(null);
-      setIsDialogOpen(false);
-      fetchReports();
+    } finally {
+      setSubmitting(false);
     }
-    setSubmitting(false);
   };
 
   const getInitials = (name: string | null) => {
@@ -234,9 +202,8 @@ const Beranda = () => {
                 </DialogTitle>
               </DialogHeader>
             </div>
-            
+
             <div className="overflow-y-auto max-h-[55vh] p-6 space-y-5">
-              {/* Title Input */}
               <div className="space-y-2">
                 <Label htmlFor="title" className="text-sm font-medium">
                   Judul<span className="text-destructive">*</span>
@@ -250,8 +217,6 @@ const Beranda = () => {
                 />
               </div>
 
-
-              {/* Tanggal Logbook */}
               <div className="space-y-2">
                 <Label htmlFor="log_date" className="text-sm font-medium">
                   Tanggal Logbook
@@ -265,7 +230,6 @@ const Beranda = () => {
                 />
               </div>
 
-              {/* Description */}
               <div className="space-y-2">
                 <Label htmlFor="description" className="text-sm font-medium">
                   Deskripsi <span className="text-destructive">*</span>
@@ -280,7 +244,6 @@ const Beranda = () => {
                 />
               </div>
 
-              {/* File Upload */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Lampiran / File Pendukung</Label>
                 {attachmentFile ? (
@@ -303,7 +266,6 @@ const Beranda = () => {
                         onClick={() => setAttachmentFile(null)}
                         className="gap-2"
                       >
-                        <X className="h-4 w-4" />
                         Hapus
                       </Button>
                     </div>
@@ -335,26 +297,25 @@ const Beranda = () => {
                 )}
               </div>
             </div>
-            
-            {/* Footer */}
+
             <div className="p-6 border-t bg-muted/30">
-                <Button 
-                  className="w-full h-12 text-base font-semibold gap-2" 
-                  onClick={handleCreateReport}
-                  disabled={submitting || !newReport.title || !newReport.description}
-                >
-                  {submitting ? (
-                    <>
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      Menyimpan Logbook...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-5 w-5" />
-                      Simpan Logbook
-                    </>
-                  )}
-                </Button>
+              <Button
+                className="w-full h-12 text-base font-semibold gap-2"
+                onClick={handleCreateReport}
+                disabled={submitting || !newReport.title || !newReport.description}
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Menyimpan Logbook...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-5 w-5" />
+                    Simpan Logbook
+                  </>
+                )}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -375,30 +336,33 @@ const Beranda = () => {
                 <div className="flex items-center gap-3">
                   <Avatar>
                     <AvatarFallback className="bg-primary text-primary-foreground">
-                      {getInitials(report.profile?.full_name || null)}
+                      {getInitials(report.profile?.fullName || null)}
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="font-medium">{report.profile?.full_name || "Anonim"}</p>
-                    <p className="text-xs text-muted-foreground">{formatDate(report.created_at)}</p>
+                    <p className="font-medium">{report.profile?.fullName || "Anonim"}</p>
+                    <p className="text-xs text-muted-foreground">{formatDate(report.createdAt)}</p>
                   </div>
                 </div>
                 <Badge className={`${statusColors[report.status]} text-white`}>
-                  {statusLabels[report.status]}
+                  {statusLabels[report.status] || report.status}
                 </Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
               <div>
                 <h3 className="font-semibold text-lg">{report.title}</h3>
-                <Badge variant="outline" className="mt-1">{report.category}</Badge>
               </div>
               <p className="text-muted-foreground">{report.description}</p>
-              {report.location && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <MapPin className="h-4 w-4" />
-                  <span>{report.location}</span>
-                </div>
+              {report.attachment && (
+                <a
+                  href={report.attachment}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-blue-500 hover:underline inline-flex items-center gap-1"
+                >
+                  📎 Lihat Lampiran
+                </a>
               )}
             </CardContent>
           </Card>

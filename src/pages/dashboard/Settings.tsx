@@ -6,15 +6,13 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { Loader2, User, Lock } from "lucide-react";
 
 const Settings = () => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const { toast } = useToast();
-  
-  const [fullName, setFullName] = useState(user?.user_metadata?.full_name || '');
-  const [currentPassword, setCurrentPassword] = useState('');
+
+  const [fullName, setFullName] = useState(user?.full_name || '');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loadingProfile, setLoadingProfile] = useState(false);
@@ -22,7 +20,7 @@ const Settings = () => {
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!fullName.trim()) {
       toast({
         title: "Validasi Gagal",
@@ -33,30 +31,49 @@ const Settings = () => {
     }
 
     setLoadingProfile(true);
-    
-    const { error } = await supabase.auth.updateUser({
-      data: { full_name: fullName }
-    });
 
-    setLoadingProfile(false);
-
-    if (error) {
-      toast({
-        title: "Gagal",
-        description: error.message,
-        variant: "destructive",
+    try {
+      const res = await fetch("/api/profile/update", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ full_name: fullName.trim() }),
       });
-    } else {
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Gagal memperbarui profil");
+      }
+
+      // Update user in localStorage
+      const storedUser = localStorage.getItem("user");
+      if (storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        parsedUser.full_name = fullName.trim();
+        localStorage.setItem("user", JSON.stringify(parsedUser));
+      }
+
       toast({
         title: "Berhasil",
         description: "Profil berhasil diperbarui",
       });
+    } catch (error) {
+      toast({
+        title: "Gagal",
+        description: error instanceof Error ? error.message : "Terjadi kesalahan",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingProfile(false);
     }
   };
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (newPassword !== confirmPassword) {
       toast({
         title: "Validasi Gagal",
@@ -76,27 +93,37 @@ const Settings = () => {
     }
 
     setLoadingPassword(true);
-    
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword
-    });
 
-    setLoadingPassword(false);
-
-    if (error) {
-      toast({
-        title: "Gagal",
-        description: error.message,
-        variant: "destructive",
+    try {
+      const res = await fetch("/api/auth/change-password", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ password: newPassword }),
       });
-    } else {
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Gagal mengubah password");
+      }
+
       toast({
         title: "Berhasil",
         description: "Password berhasil diubah",
       });
-      setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
+    } catch (error) {
+      toast({
+        title: "Gagal",
+        description: error instanceof Error ? error.message : "Terjadi kesalahan",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingPassword(false);
     }
   };
 

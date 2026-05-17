@@ -13,12 +13,12 @@ const menuItems = [
 const DashboardSidebar = () => {
 	const location = useLocation();
 	const navigate = useNavigate();
-	const { user, signOut } = useAuth();
+	const { user, logout } = useAuth();
 	const [isCollapsed, setIsCollapsed] = useState(false);
 
-	const handleLogout = async () => {
-		await signOut();
-		navigate("/"); // Mengarahkan ke halaman landing page
+	const handleLogout = () => {
+		logout();
+		navigate("/");
 	};
 
 	return (
@@ -71,7 +71,7 @@ const DashboardSidebar = () => {
 								<User className="h-5 w-5" />
 							</div>
 							<div className="flex-1 min-w-0">
-								<p className="font-medium truncate">{user.user_metadata?.full_name || 'Pengguna'}</p>
+								<p className="font-medium truncate">{user.full_name || 'Pengguna'}</p>
 								<p className="text-xs opacity-70 truncate">{user.email}</p>
 							</div>
 						</div>

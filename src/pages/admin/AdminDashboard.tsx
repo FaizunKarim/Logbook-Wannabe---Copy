@@ -2,24 +2,21 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Users, FileText, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
-interface Profile {
+interface UserWithStats {
   id: string;
   user_id: string;
   full_name: string | null;
   email: string | null;
-}
-
-interface UserWithStats extends Profile {
   reportCount: number;
 }
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const { token } = useAuth();
   const { toast } = useToast();
   const [users, setUsers] = useState<UserWithStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,33 +28,17 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const fetchAllUsers = async () => {
+      if (!token) return;
+
       try {
-        const { data: profilesData, error: profilesError } = await supabase
-          .from("profiles")
-          .select("*")
-          .order("full_name");
-
-        if (profilesError) throw profilesError;
-
-        // Get report count for each user
-        const { data: reportsData, error: reportsError } = await supabase
-          .from("reports")
-          .select("user_id");
-
-        if (reportsError) throw reportsError;
-
-        const reportCounts = new Map<string, number>();
-        reportsData?.forEach(r => {
-          reportCounts.set(r.user_id, (reportCounts.get(r.user_id) || 0) + 1);
+        const res = await fetch("/api/admin/users", {
+          headers: { Authorization: `Bearer ${token}` },
         });
+        const data = await res.json();
 
-        const usersWithStats: UserWithStats[] = profilesData?.map(profile => ({
-          ...profile,
-          reportCount: reportCounts.get(profile.user_id) || 0
-        })) || [];
+        if (!res.ok) throw new Error(data.error);
 
-        setUsers(usersWithStats);
-
+        setUsers(data.users || []);
       } catch (error) {
         console.error("Error fetching users:", error);
         toast({
@@ -71,7 +52,7 @@ export default function AdminDashboard() {
     };
 
     fetchAllUsers();
-  }, [toast]);
+  }, [token, toast]);
 
   if (loading) {
     return (
@@ -103,7 +84,7 @@ export default function AdminDashboard() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -124,7 +105,7 @@ export default function AdminDashboard() {
       {/* Users List */}
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">Daftar Mahasiswa</h2>
-        
+
         {users.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">

@@ -11,12 +11,12 @@ const menuItems = [
 
 export const AdminSidebar = () => {
 	const [isCollapsed, setIsCollapsed] = useState(false);
-	const { signOut } = useAuth();
+	const { logout } = useAuth();
 	const navigate = useNavigate();
 
-	const handleLogout = async () => {
-		await signOut();
-		navigate("/"); // Mengarahkan ke halaman landing page
+	const handleLogout = () => {
+		logout();
+		navigate("/");
 	};
 
 	return (

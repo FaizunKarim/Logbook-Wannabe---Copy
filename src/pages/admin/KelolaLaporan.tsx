@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,18 +33,13 @@ import { Search, Trash2, Eye, Loader2 } from "lucide-react";
 interface Report {
   id: string;
   title: string;
-  category: string;
-  status: string;
-  location: string | null;
-  created_at: string;
-  user_id: string;
   description: string;
-  image_url: string | null;
-}
-
-interface Profile {
-  user_id: string;
-  full_name: string | null;
+  status: string;
+  attachment: string | null;
+  createdAt: string;
+  userId: string;
+  user: { email: string } | null;
+  profile: { fullName: string | null } | null;
 }
 
 const statusOptions = [
@@ -62,8 +57,8 @@ const statusLabels: Record<string, string> = {
 };
 
 export default function KelolaLaporan() {
+  const { token } = useAuth();
   const [reports, setReports] = useState<Report[]>([]);
-  const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -72,30 +67,18 @@ export default function KelolaLaporan() {
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [updating, setUpdating] = useState(false);
 
+  const headers = { Authorization: `Bearer ${token}` };
+
   const fetchReports = async () => {
+    if (!token) return;
+
     try {
-      const { data, error } = await supabase
-        .from("reports")
-        .select("*")
-        .order("created_at", { ascending: false });
+      const res = await fetch("/api/reports", { headers });
+      const data = await res.json();
 
-      if (error) throw error;
-      setReports(data || []);
+      if (!res.ok) throw new Error(data.error);
 
-      // Fetch profiles for all users
-      const userIds = [...new Set(data?.map((r) => r.user_id) || [])];
-      if (userIds.length > 0) {
-        const { data: profileData } = await supabase
-          .from("profiles")
-          .select("user_id, full_name")
-          .in("user_id", userIds);
-
-        const profileMap: Record<string, string> = {};
-        profileData?.forEach((p) => {
-          profileMap[p.user_id] = p.full_name || "Pengguna";
-        });
-        setProfiles(profileMap);
-      }
+      setReports(data.reports || []);
     } catch (error) {
       console.error("Error fetching reports:", error);
       toast.error("Gagal memuat laporan");
@@ -106,33 +89,19 @@ export default function KelolaLaporan() {
 
   useEffect(() => {
     fetchReports();
-  }, []);
+  }, [token]);
 
   const handleStatusChange = async (reportId: string, newStatus: string) => {
     setUpdating(true);
     try {
-      const report = reports.find((r) => r.id === reportId);
-      if (!report) return;
-
-      const { error: updateError } = await supabase
-        .from("reports")
-        .update({ status: newStatus })
-        .eq("id", reportId);
-
-      if (updateError) throw updateError;
-
-      // Create notification for the user
-      const { error: notifError } = await supabase.from("notifications").insert({
-        user_id: report.user_id,
-        report_id: reportId,
-        type: "status_update",
-        title: "Status Laporan Diperbarui",
-        message: `Laporan "${report.title}" telah diubah statusnya menjadi ${statusLabels[newStatus]}.`,
+      const res = await fetch(`/api/reports?id=${reportId}`, {
+        method: "PUT",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
       });
 
-      if (notifError) {
-        console.error("Error creating notification:", notifError);
-      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
 
       setReports((prev) =>
         prev.map((r) => (r.id === reportId ? { ...r, status: newStatus } : r))
@@ -151,12 +120,13 @@ export default function KelolaLaporan() {
     if (!selectedReport) return;
 
     try {
-      const { error } = await supabase
-        .from("reports")
-        .delete()
-        .eq("id", selectedReport.id);
+      const res = await fetch(`/api/reports?id=${selectedReport.id}`, {
+        method: "DELETE",
+        headers,
+      });
 
-      if (error) throw error;
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
 
       setReports((prev) => prev.filter((r) => r.id !== selectedReport.id));
       setDeleteDialogOpen(false);
@@ -171,8 +141,7 @@ export default function KelolaLaporan() {
   const filteredReports = reports.filter((report) => {
     const matchesSearch =
       report.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      report.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      report.location?.toLowerCase().includes(searchTerm.toLowerCase());
+      report.description?.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus =
       statusFilter === "all" || report.status === statusFilter;
@@ -201,7 +170,6 @@ export default function KelolaLaporan() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Kelola Laporan</h1>
-        
       </div>
 
       {/* Filters */}
@@ -254,7 +222,6 @@ export default function KelolaLaporan() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Judul</TableHead>
-                    <TableHead>Kategori</TableHead>
                     <TableHead>Pelapor</TableHead>
                     <TableHead>Tanggal</TableHead>
                     <TableHead>Status</TableHead>
@@ -267,11 +234,10 @@ export default function KelolaLaporan() {
                       <TableCell className="font-medium max-w-[200px] truncate">
                         {report.title}
                       </TableCell>
-                      <TableCell>{report.category}</TableCell>
                       <TableCell>
-                        {profiles[report.user_id] || "Pengguna"}
+                        {report.profile?.fullName || report.user?.email || "Pengguna"}
                       </TableCell>
-                      <TableCell>{formatDate(report.created_at)}</TableCell>
+                      <TableCell>{formatDate(report.createdAt)}</TableCell>
                       <TableCell>
                         <Select
                           value={report.status}
@@ -339,10 +305,7 @@ export default function KelolaLaporan() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDeleteDialogOpen(false)}
-            >
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
               Batal
             </Button>
             <Button variant="destructive" onClick={handleDelete}>
@@ -359,32 +322,28 @@ export default function KelolaLaporan() {
             <DialogTitle>{selectedReport?.title}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            {selectedReport?.image_url && (
+            {selectedReport?.attachment && (
               <img
-                src={selectedReport.image_url}
+                src={selectedReport.attachment}
                 alt={selectedReport.title}
-                className="w-full h-48 object-contain rounded-lg" // Tambahkan object-contain
+                className="w-full h-48 object-contain rounded-lg"
               />
             )}
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <span className="text-muted-foreground">Kategori:</span>
-                <p className="font-medium">{selectedReport?.category}</p>
+                <span className="text-muted-foreground">Pelapor:</span>
+                <p className="font-medium">
+                  {selectedReport?.profile?.fullName || selectedReport?.user?.email || "-"}
+                </p>
               </div>
               <div>
                 <span className="text-muted-foreground">Status:</span>
                 <p>{selectedReport && getStatusBadge(selectedReport.status)}</p>
               </div>
               <div>
-                <span className="text-muted-foreground">Lokasi:</span>
-                <p className="font-medium">
-                  {selectedReport?.location || "-"}
-                </p>
-              </div>
-              <div>
                 <span className="text-muted-foreground">Tanggal:</span>
                 <p className="font-medium">
-                  {selectedReport && formatDate(selectedReport.created_at)}
+                  {selectedReport && formatDate(selectedReport.createdAt)}
                 </p>
               </div>
             </div>

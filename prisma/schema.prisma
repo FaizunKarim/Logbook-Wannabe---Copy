@@ -1,0 +1,79 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Tabel Auth User (sesuai Supabase Auth)
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  emailVerified DateTime? @map("email_verified")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  // Relasi
+  profile       Profile?
+  reports       Report[]
+  notifications Notification[]
+
+  @@map("users")
+}
+
+// Tabel Profiles
+model Profile {
+  id        String   @id @default(uuid())
+  userId    String   @unique @map("user_id")
+  fullName  String?  @map("full_name")
+  role      String   @default("user") // user, admin, student
+  nim       String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relasi
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reports Report[]
+
+  @@map("profiles")
+}
+
+// Tabel Laporan
+model Report {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  logDate     DateTime @map("log_date")
+  title       String
+  description String?
+  status      String   @default("pending") // pending, approved, rejected
+  attachment  String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relasi
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [userId], references: [userId], onDelete: Cascade, map: "reports_profile_id_fkey")
+
+  @@map("reports")
+}
+
+// Tabel Notifikasi
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  type      String
+  title     String
+  message   String?
+  read      Boolean  @default(false)
+  reportId  String?  @map("report_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relasi
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
