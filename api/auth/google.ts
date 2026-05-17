@@ -16,10 +16,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method !== "POST") {
+    console.error("Method not allowed:", req.method);
     return res.status(405).json({ error: "Method not allowed" });
   }
 
   if (!GOOGLE_CLIENT_ID) {
+    console.error("GOOGLE_CLIENT_ID not configured");
     return res.status(500).json({ error: "GOOGLE_CLIENT_ID belum dikonfigurasi di Vercel" });
   }
 
@@ -27,6 +29,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { id_token } = req.body;
 
     if (!id_token) {
+      console.error("id_token missing in request body");
       return res.status(400).json({ error: "id_token required" });
     }
 
@@ -37,15 +40,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!verifyRes.ok) {
       const errText = await verifyRes.text();
+      console.error("Google token verification failed:", verifyRes.status, errText);
       return res.status(401).json({ error: "Google token tidak valid" });
     }
 
     const googlePayload: any = await verifyRes.json();
+    console.log("Google Payload:", googlePayload);
 
     // Verify audience
     if (googlePayload.aud !== GOOGLE_CLIENT_ID) {
-      // Also check for aliases in case of different client ID formatting
-      if (googlePayload.azp !== GOOGLE_CLIENT_ID) {
+      if (googlePayload.azp !== GOOGLE_CLIENT_ID) { // Also check for aliases
+        console.error("Token audience mismatch:", googlePayload.aud, googlePayload.azp, GOOGLE_CLIENT_ID);
         return res.status(401).json({ error: "Token tidak sesuai dengan aplikasi ini" });
       }
     }
@@ -56,10 +61,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const picture = googlePayload.picture;
 
     if (!email) {
+      console.error("Email missing from Google payload");
       return res.status(400).json({ error: "Email tidak tersedia dari akun Google" });
     }
 
-    // Find or create user
     const prisma = getPrismaClient();
     let user = await prisma.user.findUnique({
       where: { email },
@@ -67,7 +72,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     if (user) {
+      console.log("Existing user found:", user.id);
       if (!user.googleId) {
+        console.log("Updating googleId for existing user:", user.id);
         user = await prisma.user.update({
           where: { id: user.id },
           data: { googleId },
@@ -75,6 +82,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
     } else {
+      console.log("Creating new user with Google:", email);
       user = await prisma.$transaction(async (tx) => {
         return tx.user.create({
           data: {
@@ -88,6 +96,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           include: { profile: true },
         });
       });
+      console.log("New user created:", user.id);
     }
 
     const token = jwt.sign(
@@ -112,7 +121,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     });
   } catch (error: any) {
-    console.error("Google auth error:", error?.message || error);
+    console.error("Google auth handler caught error:", error?.message || error, error?.stack);
     return res.status(500).json({
       error: "Gagal autentikasi Google: " + (error?.message || "Unknown error"),
     });
