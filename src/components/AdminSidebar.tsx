@@ -14,7 +14,6 @@ import { useState } from "react";
 
 const menuItems = [
   { title: "Dashboard", url: "/admin", icon: LayoutDashboard },
-  { title: "Kelola Laporan", url: "/admin/laporan", icon: FileText },
 ];
 
 const AdminSidebar = () => {
