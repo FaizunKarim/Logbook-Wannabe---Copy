@@ -1,5 +1,5 @@
 import { Outlet, Navigate } from "react-router-dom";
-import { AdminSidebar } from "./AdminSidebar";
+import AdminSidebar from "./AdminSidebar";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { Loader2 } from "lucide-react";
 
