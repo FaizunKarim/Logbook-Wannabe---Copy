@@ -34,13 +34,8 @@ export default function DashboardSidebar() {
 
   const mainNavItems = [
     {
-      title: "Beranda",
+      title: "Logbook",
       url: "/dashboard",
-      icon: LayoutDashboard,
-    },
-    {
-      title: "Laporan Saya",
-      url: "/dashboard/laporan",
       icon: FileText,
     },
   ];
