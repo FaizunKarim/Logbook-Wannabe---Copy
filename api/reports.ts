@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { prisma } from "./_lib/prisma.js";
 import { verifyToken, getTokenFromHeader } from "./_lib/jwt.js";
+import { del } from "@vercel/blob"; // 1. IMPORT FUNGSI DELETE BLOB
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const token = getTokenFromHeader(req.headers.authorization);
@@ -12,7 +13,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const reportId = req.query.id as string | undefined;
 
-  // ---- DELETE ----
+  // ---- DELETE BLOCK ----
   if (req.method === "DELETE") {
     if (!reportId) return res.status(400).json({ error: "Report ID required" });
     try {
@@ -21,6 +22,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       
       if (payload.role !== "admin" && report.userId !== payload.id) {
         return res.status(403).json({ error: "Forbidden" });
+      }
+
+      // 2. JIKA ADA URL LAMPIRAN, HAPUS FISIK FILENYA DARI VERCEL BLOB
+      if (report.attachment) {
+        try {
+          await del(report.attachment);
+        } catch (blobError) {
+          console.error("Gagal menghapus berkas di Vercel Blob Store:", blobError);
+        }
       }
 
       await prisma.notification.deleteMany({ where: { reportId } });
