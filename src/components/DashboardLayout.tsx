@@ -1,7 +1,8 @@
 import { Outlet, Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { DashboardSidebar } from "./DashboardSidebar";
+import DashboardSidebar from "./DashboardSidebar";
 import { Loader2 } from "lucide-react";
+import { SidebarProvider } from "@/components/ui/sidebar";
 
 const DashboardLayout = () => {
   const { user, loading } = useAuth();
@@ -19,12 +20,14 @@ const DashboardLayout = () => {
   }
 
   return (
-    <div className="min-h-screen flex w-full bg-accent">
-      <DashboardSidebar />
-      <main className="flex-1 lg:ml-0 mt-16 lg:mt-0 p-4 lg:p-8 overflow-auto">
-        <Outlet />
-      </main>
-    </div>
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full bg-accent">
+        <DashboardSidebar />
+        <main className="flex-1 p-4 lg:p-8 overflow-auto">
+          <Outlet />
+        </main>
+      </div>
+    </SidebarProvider>
   );
 };
 
