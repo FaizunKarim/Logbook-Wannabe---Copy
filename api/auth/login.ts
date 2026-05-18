@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getPrismaClient } from "../_lib/prisma.js";
+import { prisma } from "../_lib/prisma.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
@@ -17,7 +17,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: "Email dan password wajib diisi" });
     }
 
-    const prisma = getPrismaClient();
+    const prisma = prisma();
     const user = await prisma.user.findUnique({
       where: { email },
       include: { profile: true },

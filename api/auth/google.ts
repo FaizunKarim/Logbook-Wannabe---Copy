@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import jwt from "jsonwebtoken";
-import { getPrismaClient } from "../_lib/prisma.js";
+import { prisma } from "../_lib/prisma.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret-change-me";
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
@@ -65,7 +65,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: "Email tidak tersedia dari akun Google" });
     }
 
-    const prisma = getPrismaClient();
+    const prisma = prisma();
     let user = await prisma.user.findUnique({
       where: { email },
       include: { profile: true },

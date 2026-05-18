@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getPrismaClient } from "../_lib/prisma.js";
+import { prisma } from "../_lib/prisma.js";
 import { verifyToken, getTokenFromHeader } from "../_lib/jwt.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -15,7 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const prisma = getPrismaClient();
+    const prisma = prisma();
     const userId = req.query.userId as string | undefined;
 
     if (userId) {

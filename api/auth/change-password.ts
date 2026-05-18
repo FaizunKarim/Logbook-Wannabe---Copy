@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getPrismaClient } from "../_lib/prisma.js";
+import { prisma } from "../_lib/prisma.js";
 import { verifyToken, getTokenFromHeader } from "../_lib/jwt.js";
 import bcrypt from "bcryptjs";
 
@@ -24,7 +24,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    const prisma = getPrismaClient();
+    const prisma = prisma();
     await prisma.user.update({
       where: { id: payload.id },
       data: { password: hashedPassword },
