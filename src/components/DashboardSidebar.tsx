@@ -1,128 +1,114 @@
-import { Home, LogOut, Menu, User, Settings } from "lucide-react";
-import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth"; // Pastikan path hook auth kamu benar
+import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarGroup, SidebarGroupLabel, SidebarGroupContent,} from "@/components/ui/sidebar";
+import { DropdownMenu,DropdownMenuContent,DropdownMenuItem,DropdownMenuSeparator,DropdownMenuTrigger,} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { LayoutDashboard, FileText, UserPen, LogOut, ChevronsUpDown } from "lucide-react";
 
-const menuItems = [
-	{ title: "Logbook", url: "/dashboard", icon: Home },
-	{ title: "Pengaturan", url: "/dashboard/settings", icon: Settings },
-];
+export function DashboardSidebar() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
-const DashboardSidebar = () => {
-	const location = useLocation();
-	const navigate = useNavigate();
-	const { user, logout } = useAuth();
-	const [isCollapsed, setIsCollapsed] = useState(false);
+  // Menu utama yang tetap ada di tengah/atas
+  const mainNavItems = [
+    {
+      title: "Beranda",
+      url: "/dashboard",
+      icon: LayoutDashboard,
+    },
+    {
+      title: "Laporan Saya",
+      url: "/dashboard/laporan", // Sesuaikan dengan route laporan kamu
+      icon: FileText,
+    },
+  ];
 
-	const handleLogout = () => {
-		logout();
-		navigate("/");
-	};
+  return (
+    <sidebar.Sidebar>
+      {/* 1. HEADER SIDEBAR */}
+      <sidebar.SidebarHeader>
+        <div className="flex items-center gap-2 px-2 py-2">
+          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground font-bold text-sm">
+            L
+          </div>
+          <span className="font-bold text-lg">Lapor Pak</span>
+        </div>
+      </sidebar.SidebarHeader>
 
-	return (
-		<>
-			{/* Mobile Header */}
-			<div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-primary text-primary-foreground flex items-center justify-between px-4 z-50">
-				<div className="flex items-center gap-2">
-					<img
-						src="/apple-touch-icon.png"
-						alt="Logo"
-						className="h-6 w-6"
-					/>
-					<span className="font-bold">Logbook</span>
-				</div>
-				<Button
-					variant="ghost"
-					size="icon"
-					className="text-primary-foreground hover:bg-primary-foreground/10"
-					onClick={() => setIsCollapsed(!isCollapsed)}
-				>
-					<Menu className="h-6 w-6" />
-				</Button>
-			</div>
+      {/* 2. KONTEN TENGAH (Hapus menu Profil & Pengaturan lama dari sini) */}
+      <sidebar.SidebarContent>
+        <sidebar.SidebarGroup>
+          <sidebar.SidebarGroupLabel>Menu Utama</sidebar.SidebarGroupLabel>
+          <sidebar.SidebarGroupContent>
+            <sidebar.SidebarMenu>
+              {mainNavItems.map((item) => (
+                <sidebar.SidebarMenuItem key={item.title}>
+                  <sidebar.SidebarMenuButton asChild>
+                    <Link to={item.url}>
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </sidebar.SidebarMenuButton>
+                </sidebar.SidebarMenuItem>
+              ))}
+            </sidebar.SidebarMenu>
+          </sidebar.SidebarGroupContent>
+        </sidebar.SidebarGroup>
+      </sidebar.SidebarContent>
 
-			{/* Sidebar */}
-			<aside
-				className={cn(
-					"sticky top-0 z-40 bg-primary text-primary-foreground transition-transform duration-300",
-					"w-64 flex flex-col h-screen",
-					"lg:translate-x-0",
-					isCollapsed ? "-translate-x-full" : "translate-x-0",
-					"lg:pt-0 pt-16"
-				)}
-			>
-				{/* Logo - Desktop only */}
-				<div className="hidden lg:flex items-center gap-2 p-6 border-b border-primary-foreground/20">
-					<img
-						src="/apple-touch-icon.png"
-						alt="Logo"
-						className="h-8 w-8"
-					/>
-					<span className="text-xl font-bold">Logbook</span>
-				</div>
-
-				{/* User Profile */}
-				{user && (
-					<div className="p-4 border-t border-primary-foreground/20">
-						<div className="flex items-center gap-3">
-							<div className="h-10 w-10 rounded-full bg-primary-foreground/20 flex items-center justify-center">
-								<User className="h-5 w-5" />
-							</div>
-							<div className="flex-1 min-w-0">
-								<p className="font-medium truncate">{user.full_name || 'Pengguna'}</p>
-								<p className="text-xs opacity-70 truncate">{user.email}</p>
-							</div>
-						</div>
-					</div>
-				)}
-
-				{/* Navigation */}
-				<nav className="flex-1 p-4 space-y-2">
-					{menuItems.map((item) => {
-						const isActive = location.pathname === item.url;
-						return (
-							<NavLink
-								key={item.title}
-								to={item.url}
-								onClick={() => setIsCollapsed(true)}
-								className={cn(
-									"flex items-center gap-3 px-4 py-3 rounded-lg transition-colors",
-									isActive
-										? "bg-primary-foreground text-primary font-medium"
-										: "hover:bg-primary-foreground/10"
-								)}
-							>
-								<item.icon className="h-5 w-5" />
-								<span>{item.title}</span>
-							</NavLink>
-						);
-					})}
-				</nav>
-
-				{/* Logout */}
-				<div className="p-4 border-t border-primary-foreground/20">
-					<Button
-						variant="ghost"
-						className="w-full justify-start gap-3 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
-						onClick={handleLogout}
-					>
-						<LogOut className="h-5 w-5" />
-						<span>Keluar</span>
-					</Button>
-				</div>
-			</aside>
-
-			{/* Overlay for mobile */}
-			{!isCollapsed && (
-				<div
-					className="lg:hidden fixed inset-0 bg-black/50 z-30"
-					onClick={() => setIsCollapsed(true)}
-				/>
-			)}
-		</>
-	);
-};
-
-export default DashboardSidebar;
+      {/* 3. FOOTER SIDEBAR (Profil Baru + Dropdown Opsi) */}
+      <sidebar.SidebarFooter>
+        <sidebar.SidebarMenu>
+          <sidebar.SidebarMenuItem>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <sidebar.SidebarMenuButton
+                  size="lg"
+                  className="w-full data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                >
+                  <Avatar className="h-8 w-8 rounded-lg">
+                    <AvatarImage src={user?.picture || ""} alt={user?.full_name || ""} />
+                    <AvatarFallback className="rounded-lg bg-primary text-primary-foreground">
+                      {user?.full_name?.[0]?.toUpperCase() || "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="grid flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-semibold">
+                      {user?.full_name || "Nama User"}
+                    </span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {user?.email || "user@email.com"}
+                    </span>
+                  </div>
+                  <ChevronsUpDown className="ml-auto size-4 text-muted-foreground" />
+                </sidebar.SidebarMenuButton>
+              </DropdownMenuTrigger>
+              
+              {/* Isi Dropdown menu ketika Profil diklik */}
+              <DropdownMenuContent
+                className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
+                side="top" // Muncul ke atas karena letaknya di paling bawah
+                align="end"
+                sideOffset={4}
+              >
+                {/* Opsi 1: Edit Profile */}
+                <DropdownMenuItem onClick={() => navigate("/dashboard/settings")}>
+                  <UserPen className="mr-2 h-4 w-4 text-muted-foreground" />
+                  <span>Edit Profile</span>
+                </DropdownMenuItem>
+                
+                <DropdownMenuSeparator />
+                
+                {/* Opsi 2: Keluar */}
+                <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Keluar</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </sidebar.SidebarMenuItem>
+        </sidebar.SidebarMenu>
+      </sidebar.SidebarFooter>
+    </sidebar.Sidebar>
+  );
+}
