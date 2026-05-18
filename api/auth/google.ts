@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import jwt from "jsonwebtoken";
-import { getPrismaClient } from "../_lib/prisma";
+import { getPrismaClient } from "../_lib/prisma.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret-change-me";
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
