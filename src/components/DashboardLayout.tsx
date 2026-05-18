@@ -1,6 +1,6 @@
 import { Outlet, Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import DashboardSidebar from "./DashboardSidebar";
+import { DashboardSidebar } from "./DashboardSidebar";
 import { Loader2 } from "lucide-react";
 
 const DashboardLayout = () => {
