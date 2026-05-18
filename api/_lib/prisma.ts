@@ -1,17 +1,27 @@
+import pg from 'pg';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 
+const { Pool } = pg;
+
+// Ambil URL Database dari environment Vercel
+const connectionString = process.env.PRISMA_DATABASE_URL || process.env.DATABASE_URL;
+
 const prismaClientSingleton = () => {
-  return new PrismaClient()
+  // 1. Buat kolam koneksi (pool) Postgres
+  const pool = new Pool({ connectionString });
+  
+  // 2. Bungkus kolam tersebut ke dalam Prisma Adapter
+  const adapter = new PrismaPg(pool);
+  
+  // 3. Masukkan adapter ke dalam Prisma Client (Syarat mutlak Prisma v7)
+  return new PrismaClient({ adapter });
 }
 
-declare global {
-  var prisma: undefined | ReturnType<typeof prismaClientSingleton>
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
 }
 
-const prisma = globalThis.prisma ?? prismaClientSingleton()
+export const prisma = globalForPrisma.prisma || prismaClientSingleton();
 
-export const getPrismaClient = () => prisma
-
-if (process.env.NODE_ENV !== 'production') {
-  globalThis.prisma = prisma
-}
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
