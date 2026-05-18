@@ -121,7 +121,7 @@ const StudentDetail = () => {
 
       toast({
         title: "Berhasil",
-        description: "Logbook telah ditolak dan dihapus",
+        description: "Logbook telah ditolak dan dihapus (termasuk file lampirannya)",
       });
 
       fetchStudentData();
@@ -189,14 +189,34 @@ const StudentDetail = () => {
             <Card key={report.id} className="overflow-hidden">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-4">
+                  
+                  {/* BAGIAN KIRI: Konten Logbook */}
                   <div className="flex-1 space-y-2">
                     <div className="flex items-center gap-3">
                       <h4 className="font-semibold">{report.title}</h4>
-                      <div className={`w-3 h-3 rounded-full ${statusColors[report.status] || "bg-gray-400"}`} />
+                      <div 
+                        className={`w-3 h-3 rounded-full ${statusColors[report.status] || "bg-gray-400"}`} 
+                        title={report.status}
+                      />
                     </div>
                     <p className="text-xs text-muted-foreground">{formatDate(report.createdAt)}</p>
-                    <p className="text-sm text-muted-foreground">{report.description}</p>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{report.description}</p>
+                    
+                    {/* INI LINK LAMPIRANNYA */}
+                    {report.attachment && (
+                      <a
+                        href={report.attachment}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-500 hover:underline inline-flex items-center gap-1 mt-3 block w-max"
+                      >
+                        📎 Lihat File Lampiran Mahasiswa
+                      </a>
+                    )}
+
                   </div>
+
+                  {/* BAGIAN KANAN: Tombol Aksi */}
                   <div className="flex gap-2">
                     <Button
                       size="sm"
@@ -214,6 +234,7 @@ const StudentDetail = () => {
                       Tolak
                     </Button>
                   </div>
+
                 </div>
               </CardContent>
             </Card>
