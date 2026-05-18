@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { prisma } from "../_lib/prisma.js";
-import { verifyToken, getTokenFromHeader } from "../_lib/jwt.js";
+import { verifyToken, getTokenFromHeader } from "../_lib/jwt.js.js";
 import bcrypt from "bcryptjs";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
