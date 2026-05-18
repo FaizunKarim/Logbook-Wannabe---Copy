@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 
 const menuItems = [
 	{ title: "Dashboard", url: "/admin", icon: LayoutDashboard },
-	{ title: "Kelola Laporan", url: "/admin/laporan", icon: FileText },
 ];
 
 export const AdminSidebar = () => {

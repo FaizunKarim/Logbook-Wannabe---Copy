@@ -246,7 +246,7 @@ const Beranda = () => {
               </Label>
               <Input
                 id="title"
-                placeholder="Contoh: Mengerjakan fitur scraping data..."
+                placeholder="Contoh: Mengerjakan fitur backend API"
                 value={newReport.title}
                 onChange={(e) => setNewReport({ ...newReport, title: e.target.value })}
                 className="h-11"
