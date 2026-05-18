@@ -24,7 +24,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    const prisma = prisma();
     await prisma.user.update({
       where: { id: payload.id },
       data: { password: hashedPassword },

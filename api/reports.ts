@@ -19,7 +19,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
-      const prisma = prisma();
       const report = await prisma.report.findUnique({ where: { id: reportId } });
 
       if (!report) {
@@ -49,7 +48,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
-      const prisma = prisma();
       const report = await prisma.report.findUnique({ where: { id: reportId } });
 
       if (!report) {
@@ -107,7 +105,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: "Judul dan deskripsi wajib diisi" });
       }
 
-      const prisma = prisma();
       const report = await prisma.report.create({
         data: {
           userId: payload.id, // From JWT, not from client body
@@ -132,7 +129,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // ---- GET: /api/reports (optional ?id=xxx) ----
   if (req.method === "GET") {
     try {
-      const prisma = prisma();
       if (reportId) {
         // Single report
         const report = await prisma.report.findUnique({

@@ -15,7 +15,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const prisma = prisma();
     const userId = req.query.userId as string | undefined;
 
     if (userId) {

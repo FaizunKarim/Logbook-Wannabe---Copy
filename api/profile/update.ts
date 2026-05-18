@@ -21,7 +21,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: "Nama lengkap harus diisi" });
     }
 
-    const prisma = prisma();
     const profile = await prisma.profile.update({
       where: { userId: payload.id },
       data: { fullName: full_name.trim() },

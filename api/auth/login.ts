@@ -17,7 +17,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: "Email dan password wajib diisi" });
     }
 
-    const prisma = prisma();
     const user = await prisma.user.findUnique({
       where: { email },
       include: { profile: true },
