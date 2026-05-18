@@ -1,18 +1,17 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from '@prisma/client';
 
-// Lazy init for Vercel serverless cold starts
-let prisma: PrismaClient;
+const prismaClientSingleton = () => {
+  return new PrismaClient()
+}
 
-export function getPrismaClient() {
-  if (!prisma) {
-    prisma = new PrismaClient({
-      // Use direct database URL (not Data Proxy URL) for serverless functions
-      datasources: {
-        db: {
-          url: process.env.PRISMA_DATABASE_URL || process.env.DATABASE_URL,
-        },
-      },
-    });
-  }
-  return prisma;
+declare global {
+  var prisma: undefined | ReturnType<typeof prismaClientSingleton>
+}
+
+const prisma = globalThis.prisma ?? prismaClientSingleton()
+
+export const getPrismaClient = () => prisma
+
+if (process.env.NODE_ENV !== 'production') {
+  globalThis.prisma = prisma
 }

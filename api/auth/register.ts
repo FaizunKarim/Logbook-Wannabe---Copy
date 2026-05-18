@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getPrismaClient } from "../_lib/prisma.js";
+import { getPrismaClient } from "../_lib/prisma";
 import bcrypt from "bcryptjs";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

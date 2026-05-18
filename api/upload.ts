@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { put } from "@vercel/blob";
-import { verifyToken, getTokenFromHeader } from "./_lib/jwt.js";
+import { verifyToken, getTokenFromHeader } from "./_lib/jwt";
 
 export const config = {
   api: {
