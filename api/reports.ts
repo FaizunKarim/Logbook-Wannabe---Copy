@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { prisma } from "./_lib/prisma";
-import { verifyToken, getTokenFromHeader } from "./_lib/jwt";
+import { getPrismaClient } from "./_lib/prisma.js";
+import { verifyToken, getTokenFromHeader } from "./_lib/jwt.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const token = getTokenFromHeader(req.headers.authorization);
@@ -19,18 +19,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
+      const prisma = getPrismaClient();
       const report = await prisma.report.findUnique({ where: { id: reportId } });
 
       if (!report) {
         return res.status(404).json({ error: "Laporan tidak ditemukan" });
       }
 
-      // Only admin or the report owner can delete
       if (payload.role !== "admin" && report.userId !== payload.id) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
-      // Delete related notifications first
       await prisma.notification.deleteMany({ where: { reportId } });
       await prisma.report.delete({ where: { id: reportId } });
 
@@ -41,44 +40,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  // ---- PUT: /api/reports?id=xxx ----
+  // ---- PUT: /api/reports?id=xxx (EDIT & ACC) ----
   if (req.method === "PUT") {
     if (!reportId) {
       return res.status(400).json({ error: "Report ID required" });
     }
 
     try {
+      const prisma = getPrismaClient();
       const report = await prisma.report.findUnique({ where: { id: reportId } });
 
       if (!report) {
         return res.status(404).json({ error: "Laporan tidak ditemukan" });
       }
 
-      const { status, title, description } = req.body;
-
+      const { title, description, log_date, attachment, status } = req.body;
       const updateData: Record<string, unknown> = {};
 
+      // Jika ada perubahan status (Hanya Admin yang bisa ACC)
       if (status !== undefined) {
-        // Only admin can update status
         if (payload.role !== "admin") {
           return res.status(403).json({ error: "Hanya admin yang dapat mengubah status" });
         }
         updateData.status = status;
-
-        // Create notification for user
-        await prisma.notification.create({
-          data: {
-            userId: report.userId,
-            reportId: report.id,
-            type: "status_update",
-            title: "Status Laporan Diperbarui",
-            message: `Laporan "${report.title}" telah diubah statusnya menjadi ${status}.`,
-          },
-        });
       }
 
-      if (title !== undefined) updateData.title = title;
-      if (description !== undefined) updateData.description = description;
+      // Jika user/admin mengedit konten laporan
+      if (title !== undefined || description !== undefined) {
+        if (payload.role !== "admin" && report.userId !== payload.id) {
+          return res.status(403).json({ error: "Forbidden" });
+        }
+        if (title !== undefined) updateData.title = title;
+        if (description !== undefined) updateData.description = description;
+        if (log_date !== undefined) updateData.logDate = new Date(log_date);
+        if (attachment !== undefined) updateData.attachment = attachment;
+      }
 
       const updated = await prisma.report.update({
         where: { id: reportId },
@@ -105,9 +101,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: "Judul dan deskripsi wajib diisi" });
       }
 
+      const prisma = getPrismaClient();
       const report = await prisma.report.create({
         data: {
-          userId: payload.id, // From JWT, not from client body
+          userId: payload.id,
           title,
           description,
           logDate: log_date ? new Date(log_date) : new Date(),
@@ -126,42 +123,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  // ---- GET: /api/reports (optional ?id=xxx) ----
+  // ---- GET: /api/reports ----
   if (req.method === "GET") {
     try {
-      if (reportId) {
-        // Single report
-        const report = await prisma.report.findUnique({
-          where: { id: reportId },
-          include: { profile: true, user: { select: { email: true } } },
-        });
-
-        if (!report) {
-          return res.status(404).json({ error: "Laporan tidak ditemukan" });
-        }
-
-        // Only admin or owner can view
-        if (payload.role !== "admin" && report.userId !== payload.id) {
-          return res.status(403).json({ error: "Forbidden" });
-        }
-
-        return res.status(200).json({ report });
-      }
-
-      // List reports
+      const prisma = getPrismaClient();
+      
       const where: Record<string, unknown> = {};
-
       if (payload.role !== "admin") {
-        // User only sees their own reports
         where.userId = payload.id;
       }
 
       const reports = await prisma.report.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        orderBy: { logDate: "desc" },
         include: {
           profile: { select: { fullName: true } },
-          user: { select: { email: true } },
         },
       });
 
